@@ -336,21 +336,20 @@ If this project helped you, please consider:
 
 ## 📞 Contact
 
-- **GitHub**: [@yourusername](https://github.com/tekdi)
-- **Email**: piyush.bhavsar@tekditechnologies.com
-- **Twitter**: [@yourusername](https://twitter.com/yourusername)
-- **LinkedIn**: [Your Name](https://linkedin.com/in/yourname)
+- **GitHub**: https://github.com/aniiket-dev 
+- **Email**: aniketdtech@gmail.com
+- **LinkedIn**: https://www.linkedin.com/in/aniket-diwakar
 
 ---
 
 <div align="center">
   <p>Made with ❤️ by developers, for developers</p>
   <p>
-    <a href="https://github.com/yourusername/sql-nlp-interface">
-      <img src="https://img.shields.io/github/stars/yourusername/sql-nlp-interface?style=social" alt="GitHub stars">
+    <a href="https://github.com/aniiket-dev/sql-nlp-interface">
+      <img src="https://img.shields.io/github/stars/aniiket-dev/sql-nlp-interface?style=social" alt="GitHub stars">
     </a>
-    <a href="https://github.com/yourusername/sql-nlp-interface/network/members">
-      <img src="https://img.shields.io/github/forks/yourusername/sql-nlp-interface?style=social" alt="GitHub forks">
+    <a href="https://github.com/aniiket-dev/sql-nlp-interface/network/members">
+      <img src="https://img.shields.io/github/forks/aniiket-dev/sql-nlp-interface?style=social" alt="GitHub forks">
     </a>
   </p>
 </div> 
