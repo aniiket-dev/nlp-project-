@@ -3,199 +3,225 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SQL Natural Language Interface</title>
+    <title>AI Data Analyst | Precise Filtering</title>
     <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.2/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Fira+Code&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    </style>
 </head>
-<body>
+<body class="bg-slate-950 text-slate-200">
     <div id="root"></div>
+
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState } = React;
 
         const App = () => {
-            const [schema, setSchema] = useState('');
             const [query, setQuery] = useState('');
             const [results, setResults] = useState(null);
             const [sqlQuery, setSqlQuery] = useState('');
-            const [csvFile, setCsvFile] = useState(null);
-            const [error, setError] = useState('');
             const [loading, setLoading] = useState(false);
             const [summary, setSummary] = useState('');
 
-            // Fetch schema on mount
-            useEffect(() => {
-                fetchSchema();
-            }, []);
+            const fullDataset = [
+                { id: 101, name: "Aaditya", gpa: 3.8, major: "DS" },
+                { id: 102, name: "Aniket", gpa: 3.9, major: "CS" },
+                { id: 103, name: "Nandni", gpa: 4.0, major: "CS" },
+                { id: 104, name: "Aditi", gpa: 3.7, major: "IT" },
+                { id: 105, name: "Priya", gpa: 3.6, major: "DS" },
+                { id: 106, name: "Dinkal", gpa: 3.5, major: "EC" },
+                { id: 107, name: "Harsita", gpa: 3.9, major: "DS" },
+                { id: 108, name: "Anuj", gpa: 3.2, major: "ME" },
+                { id: 109, name: "Rohan", gpa: 3.4, major: "CE" },
+                { id: 110, name: "Yadav", gpa: 3.1, major: "EE" }
+            ];
 
-            const fetchSchema = async () => {
-                try {
-                    const response = await fetch('http://localhost:8001/fetch-schema');
-                    const data = await response.json();
-                    setSchema(data.schema);
-                } catch (err) {
-                    setError('Failed to fetch schema');
+            const simulateInference = (input) => {
+                const text = input.toLowerCase();
+                let sql = "SELECT * FROM students;";
+                let data = []; // Start empty to ensure strict filtering
+                let msg = "";
+
+                // 1. Precise GPA Math Filtering (e.g., "GPA > 3.8" or "GPA greater than 3.5")
+                const gpaMatch = text.match(/(?:gpa)\s*(?:>|greater than|above)\s*(\d+(\.\d+)?)/);
+                
+                if (gpaMatch) {
+                    const threshold = parseFloat(gpaMatch[1]);
+                    sql = `SELECT * FROM students WHERE gpa > ${threshold} ORDER BY gpa DESC;`;
+                    data = fullDataset.filter(s => s.gpa > threshold);
+                    msg = data.length > 0 
+                        ? `Success: Identified ${data.length} students with a GPA strictly above ${threshold}.` 
+                        : `No matches found: No records in the database exceed a ${threshold} GPA.`;
+                } 
+                // 2. Specific Name Search (e.g., "Search for Aniket")
+                else if (fullDataset.some(s => text.includes(s.name.toLowerCase()))) {
+                    const student = fullDataset.find(s => text.includes(s.name.toLowerCase()));
+                    sql = `SELECT * FROM students WHERE name = '${student.name}';`;
+                    data = [student];
+                    msg = `Point Query: Retrieving the unique identity record for ${student.name}.`;
                 }
+                // 3. Department Filtering (e.g., "CS Students")
+                else if (text.includes("cs") || text.includes("computer science")) {
+                    sql = "SELECT * FROM students WHERE major = 'CS';";
+                    data = fullDataset.filter(s => s.major === "CS");
+                    msg = `Batch Query: Extracted ${data.length} records from the Computer Science department.`;
+                }
+                else if (text.includes("ds") || text.includes("data science")) {
+                    sql = "SELECT * FROM students WHERE major = 'DS';";
+                    data = fullDataset.filter(s => s.major === "DS");
+                    msg = `Batch Query: Extracted ${data.length} records from the Data Science department.`;
+                }
+                // 4. Default / Show All
+                else {
+                    sql = "SELECT * FROM students;";
+                    data = [...fullDataset];
+                    msg = "General Query: Returning full student master table.";
+                }
+
+                return { sql, data, msg };
             };
 
-            const handleQuerySubmit = async (e) => {
+            const handleExecute = (e) => {
                 e.preventDefault();
-                setError('');
-                setResults(null);
-                setSqlQuery('');
-                setCsvFile(null);
-                setSummary('');
+                if (!query.trim()) return;
                 setLoading(true);
-
-                try {
-                    const response = await fetch('http://localhost:8001/generate-query', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ user_query: query, db_schema: schema })
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
-                    const data = await response.json();
-                    setSqlQuery(data.sql_query);
-                    setResults(data.results);
-                    if (data.csv_base64) {
-                        const downloadLink = `data:text/csv;base64,${data.csv_base64}`;
-                        setCsvFile({ name: data.csv_filename, link: downloadLink });
-                    }
-                    if (data.summary) setSummary(data.summary);
-                } catch (err) {
-                    setError(`Error: ${err.message}`);
-                } finally {
+                setResults(null);
+                
+                // Simulated thinking delay
+                setTimeout(() => {
+                    const output = simulateInference(query);
+                    setSqlQuery(output.sql);
+                    setResults(output.data);
+                    setSummary(output.msg);
                     setLoading(false);
-                }
+                }, 600);
             };
+
+            const sampleQueries = [
+                "GPA greater than 3.8",
+                "GPA above 4.0",
+                "Show CS students",
+                "Search for Aniket",
+                "List DS students",
+                "Show all students"
+            ];
 
             return (
-                <div className="min-h-screen bg-gray-100 p-6">
-                    <div className="max-w-4xl mx-auto">
-                        <h1 className="text-3xl font-bold text-gray-800 mb-6">SQL Natural Language Interface</h1>
-
-                        {/* Schema Display */}
-                        <div className="bg-white p-4 rounded-lg shadow mb-6">
-                            <h2 className="text-xl font-semibold mb-2">Database Schema</h2>
-                            <pre className="bg-gray-50 p-4 rounded text-sm overflow-auto max-h-60">
-                                {schema || 'Loading schema...'}
-                            </pre>
+                <div className="flex h-screen overflow-hidden">
+                    {/* Sidebar */}
+                    <aside className="w-72 border-r border-white/10 p-6 flex flex-col bg-slate-900 shadow-2xl">
+                        <div className="mb-10">
+                            <h1 className="text-white font-black text-xl flex items-center gap-2">
+                                <i className="fas fa-microchip text-blue-500"></i> NL2SQL <span className="text-blue-500 font-thin">LITE</span>
+                            </h1>
+                            <p className="text-[10px] text-slate-500 mt-1 font-bold">FRONTEND-ONLY SIMULATION</p>
                         </div>
+                        
+                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                            <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-4">Sample Actions</p>
+                            <div className="space-y-2">
+                                {sampleQueries.map((q, i) => (
+                                    <button 
+                                        key={i} 
+                                        onClick={() => setQuery(q)} 
+                                        className="w-full text-left p-3 rounded-xl text-xs bg-white/5 text-slate-400 hover:bg-blue-600 hover:text-white transition-all border border-transparent active:scale-95"
+                                    >
+                                        <i className="fas fa-chevron-right mr-2 opacity-20 text-[8px]"></i> {q}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </aside>
 
-                        {/* Query Input */}
-                        <div className="bg-white p-4 rounded-lg shadow mb-6">
-                            <h2 className="text-xl font-semibold mb-2">Enter Your Query</h2>
-                            <form onSubmit={handleQuerySubmit}>
-                                <textarea
-                                    className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    rows="4"
-                                    placeholder="e.g., List all customers who made purchases in the last month"
+                    {/* Main Interface */}
+                    <main className="flex-1 overflow-y-auto p-12 bg-slate-50 custom-scrollbar">
+                        <div className="max-w-4xl mx-auto">
+                            <header className="mb-10 flex justify-between items-end">
+                                <div>
+                                    <h2 className="text-4xl font-black text-slate-900 tracking-tighter">System Output</h2>
+                                    <p className="text-slate-500 font-medium">Verify the accuracy of the SQL translation and result filtering below.</p>
+                                </div>
+                            </header>
+
+                            <form onSubmit={handleExecute} className="bg-white p-8 rounded-[2.5rem] shadow-2xl shadow-slate-200/60 border border-slate-100 mb-10">
+                                <textarea 
+                                    className="w-full p-6 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all mb-6 text-xl font-bold text-slate-800"
+                                    rows="2"
+                                    placeholder="Type a query (e.g., GPA greater than 3.8)..."
                                     value={query}
                                     onChange={(e) => setQuery(e.target.value)}
-                                    disabled={loading}
                                 />
-                                <button
-                                    type="submit"
-                                    className={`mt-3 px-4 py-2 rounded-lg text-white ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'}`}
-                                    disabled={loading}
-                                >
-                                    {loading ? 'Processing...' : 'Generate SQL'}
-                                </button>
-                            </form>
-                        </div>
-
-                        {/* Error Message */}
-                        {error && (
-                            <div className="bg-red-100 p-4 rounded-lg text-red-700 mb-6">
-                                {error}
-                            </div>
-                        )}
-
-                        {/* Generated SQL */}
-                        {sqlQuery && (
-                            <div className="bg-white p-4 rounded-lg shadow mb-6">
-                                <h2 className="text-xl font-semibold mb-2">Generated SQL Query</h2>
-                                <pre className="bg-gray-50 p-4 rounded text-sm overflow-auto">
-                                    {sqlQuery}
-                                </pre>
-                            </div>
-                        )}
-
-                        {/* Results Table */}
-                        {results && results.length > 0 && (
-                            <div className="bg-white p-4 rounded-lg shadow mb-6">
-                                <h2 className="text-xl font-semibold mb-2">Query Results</h2>
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full divide-y divide-gray-200">
-                                        <thead className="bg-gray-50">
-                                            <tr>
-                                                {Object.keys(results[0]).map((key) => (
-                                                    <th
-                                                        key={key}
-                                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                                    >
-                                                        {key}
-                                                    </th>
-                                                ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody className="bg-white divide-y divide-gray-200">
-                                            {results.map((row, index) => (
-                                                <tr key={index}>
-                                                    {Object.values(row).map((value, i) => (
-                                                        <td
-                                                            key={i}
-                                                            className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
-                                                        >
-                                                            {value !== null ? (
-                                                                typeof value === 'object'
-                                                                    ? <pre className="whitespace-pre-wrap">{JSON.stringify(value, null, 2)}</pre>
-                                                                    : value.toString()
-                                                            ) : (
-                                                                'NULL'
-                                                            )}
-                                                        </td>
-                                                    ))}
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                <div className="flex justify-end">
+                                    <button type="submit" className="bg-slate-900 hover:bg-blue-600 text-white font-black py-4 px-12 rounded-2xl flex items-center gap-3 transition-all active:scale-95 shadow-xl">
+                                        {loading ? <i className="fas fa-circle-notch animate-spin"></i> : <i className="fas fa-play text-xs"></i>}
+                                        {loading ? 'Analyzing' : 'Execute Query'}
+                                    </button>
                                 </div>
-                            </div>
-                        )}
+                            </form>
 
-                        {/* CSV Download */}
-                        {csvFile && (
-                            <div className="bg-white p-4 rounded-lg shadow">
-                                <h2 className="text-xl font-semibold mb-2">Download Results</h2>
-                                <a
-                                    href={csvFile.link}
-                                    download={csvFile.name}
-                                    className="inline-block px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
-                                >
-                                    Download CSV
-                                </a>
-                            </div>
-                        )}
+                            {results && (
+                                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    {/* SQL Code Block */}
+                                    <div className="bg-slate-900 rounded-3xl p-8 shadow-2xl border border-white/5">
+                                        <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-4">Translated SQL Statement</p>
+                                        <code className="text-blue-400 font-mono text-lg">{sqlQuery}</code>
+                                    </div>
 
-                        {/* Summary */}
-                        {summary && (
-                            <div className="mt-6 bg-white p-4 rounded-lg shadow mb-6">
-                                <h2 className="text-xl font-semibold mb-2">Summary</h2>
-                                <p className="text-gray-700">{summary}</p>
-                            </div>
-                        )}
-                    </div>
+                                    {/* AI Insight Box */}
+                                    <div className="bg-blue-600 p-8 rounded-[2rem] text-white shadow-xl shadow-blue-500/20">
+                                        <h4 className="text-blue-200 font-bold text-[10px] uppercase tracking-widest mb-2">Simulation Log</h4>
+                                        <p className="text-xl font-bold italic">"{summary}"</p>
+                                    </div>
+
+                                    {/* Results Table */}
+                                    <div className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-2xl">
+                                        <div className="px-10 py-6 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
+                                            <span className="font-black text-slate-900 uppercase text-xs tracking-widest">Database Response</span>
+                                            <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-4 py-1.5 rounded-full uppercase">{results.length} Rows Returned</span>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left">
+                                                <thead className="bg-slate-50 text-slate-400 font-black uppercase text-[10px] border-b">
+                                                    <tr>
+                                                        <th className="px-10 py-5">ID</th>
+                                                        <th className="px-10 py-5">Student Name</th>
+                                                        <th className="px-10 py-5">GPA</th>
+                                                        <th className="px-10 py-5">Major</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {results.length > 0 ? results.map((row, i) => (
+                                                        <tr key={i} className="hover:bg-blue-50/50 transition-colors">
+                                                            <td className="px-10 py-5 font-mono text-slate-400">#{row.id}</td>
+                                                            <td className="px-10 py-5 font-black text-slate-900">{row.name}</td>
+                                                            <td className="px-10 py-5 text-blue-600 font-black">{row.gpa}</td>
+                                                            <td className="px-10 py-5 text-slate-500 font-bold">{row.major}</td>
+                                                        </tr>
+                                                    )) : (
+                                                        <tr>
+                                                            <td colSpan="4" className="px-10 py-20 text-center text-slate-300 font-bold uppercase tracking-widest">Null Set: No data matches this query</td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </main>
                 </div>
             );
         };
 
-        ReactDOM.render(<App />, document.getElementById('root'));
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
